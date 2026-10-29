@@ -51,11 +51,14 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--room);
 }
 #sound:focus-visible, #books:focus-visible { outline: 2px solid var(--marquee); outline-offset: 3px; }
 #books {
+  transition: background .4s ease;
   position: fixed; top: max(14px, env(safe-area-inset-top)); left: max(14px, env(safe-area-inset-left));
   z-index: 4; font-family: var(--pixel); font-size: 10px; color: #120f1c; text-decoration: none;
   background: var(--marquee); border-radius: 8px; padding: 10px 12px;
 }
 #books[hidden] { display: none; }
+#books.pop { animation: pop .45s ease; }
+@keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.12); } 100% { transform: scale(1); } }
 
 /* Bottom card */
 #hud {
@@ -809,8 +812,27 @@ async function eject() {
 }
 
 /* ---------- bottom card ---------- */
+// the yellow corner button follows the loaded cartridge: books, App Store, or support page
+const BOOKS_LINK = { href: "https://www.amazon.com/stores/author/B0HPCTL3QY/allbooks", label: "\u{1F4DA} REX BOOKS ON AMAZON" };
+const AUTHOR_LINK = { href: "https://www.amazon.com/stores/author/B0HPCTL3QY", label: "\u{1F464} AJ OLIVER ON AMAZON" };
+function setCorner(game) {
+  let href = BOOKS_LINK.href, label = BOOKS_LINK.label, color = "#ffcf3f";
+  if (game) color = game.color;
+  if (game && game.id === "author") { href = AUTHOR_LINK.href; label = AUTHOR_LINK.label; }
+  else if (game && game.link && game.id !== "rex-books") {
+    href = game.link.href;
+    label = game.link.href.includes("apps.apple.com")
+      ? "\u{1F4F1} GET " + game.name.toUpperCase() + " ON THE APP STORE"
+      : "\u{1F310} " + game.link.text.toUpperCase();
+  }
+  const a = $("books");
+  a.style.background = color;
+  if (a.href === href && a.textContent === label) return;
+  a.href = href; a.textContent = label;
+  a.classList.remove("pop"); void a.offsetWidth; a.classList.add("pop");
+}
 function setHud(game) {
-  $("hud").hidden = false;
+  $("hud").hidden = false; setCorner(game);
   const text = $("hudText"), btns = $("hudBtns");
   text.innerHTML = ""; btns.innerHTML = "";
   if (!game) {
@@ -822,10 +844,6 @@ function setHud(game) {
   if (game.voice) {
     const b = document.createElement("button"); b.className = "btn"; b.id = "say"; b.type = "button";
     b.textContent = voice.paused ? "▶ HEAR IT" : "■ STOP"; b.addEventListener("click", speak); btns.appendChild(b);
-  }
-  if (game.link) {
-    const a = document.createElement("a"); a.className = "btn"; a.href = game.link.href; a.target = "_blank"; a.rel = "noopener";
-    a.textContent = game.link.text + " ↗"; btns.appendChild(a);
   }
   const e = document.createElement("button"); e.className = "btn alt"; e.type = "button"; e.textContent = "⏏ EJECT";
   e.addEventListener("click", eject); btns.appendChild(e);
