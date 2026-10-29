@@ -227,7 +227,7 @@ renderer.toneMappingExposure = 1.15;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0d0a16);
 scene.fog = new THREE.Fog(0x0d0a16, 9, 24);
-const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.05, 80);
+const camera = new THREE.PerspectiveCamera(narrow() ? 40 : 54, innerWidth / innerHeight, 0.05, 80);
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
@@ -582,7 +582,7 @@ function buildLayout(c) {
     if (y <= S.H - S.pad + 10 || size === 22) return L;
   }
 }
-let attract = true;
+let attract = true, demo = false;
 function pxDog(g, x, y, u, f) {
   const r = (c, a, b, w, h) => { g.fillStyle = c; g.fillRect(x + a * u, y + b * u, w * u, h * u); };
   const K = "#151515", T = "#c9742e";
@@ -604,8 +604,54 @@ function drawAttract(g, t) {
   g.fillStyle = "#fbf7ee"; const bx = ((t * 190 + 520) % (S.W + 260)) - 160;
   g.fillRect(bx, 488, 26, 8); g.fillRect(bx - 4, 484, 8, 16); g.fillRect(bx + 22, 484, 8, 16);
 }
+// a little RexRun demo plays on the screen while no cartridge is loaded
+function homeDemo() { attract = false; demo = true; scrOn = true; scrContent = null; scrAnimating = false; }
+function drawDemo(g, t) {
+  const W = S.W, GY = 470, SP = 300, DX = 210, U = 7, cam = t * SP;
+  // far skyline (Rex Avenue) drifting slowly
+  g.fillStyle = "#0b2a1d";
+  for (let i = -1; i < 9; i++) {
+    const bx = ((i * 150 - cam * .25) % 1350 + 1350) % 1350 - 150, h = 60 + ((i * 37) % 5) * 22;
+    g.fillRect(bx, GY - 40 - h, 120, h + 40);
+    g.fillStyle = "#1f5a3c"; for (let w = 0; w < 3; w++) g.fillRect(bx + 18 + w * 34, GY - 20 - h + 18, 12, 14); g.fillStyle = "#0b2a1d";
+  }
+  // ground with scrolling dashes
+  g.fillStyle = "#3f8f63"; g.fillRect(0, GY, W, 5);
+  g.fillStyle = "#2a6b49"; for (let x = -(cam % 60); x < W; x += 60) g.fillRect(x, GY + 18, 26, 4);
+  // obstacles: hydrant, puddle (Rex hates puddles), cone
+  const GAP = 520, first = Math.floor((cam - 200) / GAP), obs = [];
+  for (let k = first; k < first + 4; k++) {
+    if (k < 1) continue;
+    const x = k * GAP - cam + 300, kind = k % 3; obs.push(x);
+    if (kind === 0) { g.fillStyle = "#e5484d"; g.fillRect(x, GY - 44, 26, 44); g.fillRect(x - 6, GY - 32, 38, 10); g.fillRect(x + 4, GY - 52, 18, 8); }
+    else if (kind === 1) { g.fillStyle = "#4aa8ff"; g.fillRect(x - 10, GY - 6, 70, 6); g.fillStyle = "#9fd2ff"; g.fillRect(x + 6, GY - 6, 14, 3); }
+    else { g.fillStyle = "#ff9f1a"; g.fillRect(x + 8, GY - 40, 10, 40); g.fillRect(x + 2, GY - 24, 22, 24); g.fillRect(x - 4, GY - 6, 34, 6); g.fillStyle = "#fbf7ee"; g.fillRect(x + 4, GY - 22, 18, 5); }
+  }
+  // bones float between obstacles; Rex snaps them up as he passes
+  let score = 0;
+  const bk = Math.floor((cam + DX + 40 - 300 - GAP / 2) / GAP);
+  score = Math.max(0, bk) * 10 + Math.max(0, Math.floor((cam - 300) / GAP)) * 5;
+  for (let k = Math.max(1, bk + 1); k < bk + 4; k++) {
+    const x = k * GAP + GAP / 2 - cam + 300, y = GY - 46 + Math.sin(t * 4 + k) * 4;
+    if (x < DX + 40 || x > W + 40) continue;
+    g.fillStyle = "#fbf7ee"; g.fillRect(x, y, 30, 8); g.fillRect(x - 5, y - 4, 9, 16); g.fillRect(x + 26, y - 4, 9, 16);
+  }
+  // Rex runs and hops each obstacle
+  let jump = 0;
+  for (const x of obs) { const d = (x + 15) - (DX + 55); if (d > -110 && d < 130) jump = Math.max(jump, 120 * (1 - Math.pow((d - 10) / 120, 2))); }
+  const airborne = jump > 4;
+  pxDog(g, DX, GY - 8 * U - jump, U, airborne ? 1 : Math.floor(t * 10) % 2);
+  if (!airborne) { g.fillStyle = "rgba(125,255,176,.35)"; g.fillRect(DX - 20 - (t * 300 % 30), GY - 10, 10, 4); }
+  // HUD
+  g.textBaseline = "middle"; g.shadowColor = "rgba(125,255,176,.7)"; g.shadowBlur = 8;
+  g.font = `22px "Press Start 2P", monospace`; g.fillStyle = "#7dffb0";
+  g.textAlign = "left"; g.fillText("REXRUN", 48, 56);
+  g.textAlign = "right"; g.fillText("SCORE " + String(score % 100000).padStart(5, "0"), W - 48, 56);
+  if (Math.floor(t / .6) % 2 === 0) { g.textAlign = "center"; g.fillStyle = "#ffcf3f"; g.shadowColor = "rgba(255,207,63,.8)"; g.font = `20px "Press Start 2P", monospace`; g.fillText("PICK A CARTRIDGE", W / 2, 120); }
+  g.textAlign = "center"; g.shadowBlur = 0; g.fillStyle = "#3f8f63"; g.font = `26px VT323, monospace`; g.fillText("DEMO", W / 2, 540);
+}
 function bootScreen(c) {
-  attract = false; scrContent = c; scrLayout = buildLayout(c); scrStart = clock.elapsedTime; scrOn = true; scrAnimating = true;
+  attract = false; demo = false; scrContent = c; scrLayout = buildLayout(c); scrStart = clock.elapsedTime; scrOn = true; scrAnimating = true;
 }
 function drawScreen(t) {
   const g = scr.g;
@@ -614,6 +660,8 @@ function drawScreen(t) {
   g.fillStyle = bg; g.fillRect(0, 0, S.W, S.H);
   if (attract) {
     drawAttract(g, t);
+  } else if (demo) {
+    drawDemo(g, t);
   } else if (scrOn && scrLayout) {
     const el = t - scrStart;
     if (el < .3 && !reduceMotion) {
@@ -879,9 +927,10 @@ const bez = (a, c, b, k, out) => out.set(
 const tanHalf = () => 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
 function overviewView() {
   const t = tanHalf(), a = camera.aspect;
-  const d = Math.max(3.9, (narrow() ? 2.4 : 3.0) / (t * a), 2.7 / t);
-  const target = new THREE.Vector3(narrow() ? 0.3 : 0.22, narrow() ? 0.62 : 0.8, 0.35);
-  const dir = new THREE.Vector3(0, 0.3, 1).normalize();
+  // computer: wider lens, closer in, a little lower and off to one side, so the room has more depth
+  const d = narrow() ? Math.max(3.9, 2.4 / (t * a), 2.7 / t) : Math.max(2.85, 3.0 / (t * a), 2.6 / t);
+  const target = new THREE.Vector3(narrow() ? 0.3 : 0.12, narrow() ? 0.62 : 0.78, 0.35);
+  const dir = (narrow() ? new THREE.Vector3(0, 0.3, 1) : new THREE.Vector3(0.28, 0.2, 1)).normalize();
   return { pos: target.clone().addScaledVector(dir, d), target };
 }
 function screenView() {
@@ -934,6 +983,8 @@ async function insert(i) {
   setHud(games[i]);
   await flyTo(screenView(), .9);
   busy = false;
+  // the first time someone loads "Meet the Author", AJ says hello
+  if (games[i].id === "author" && !insert.greeted && soundOn) { insert.greeted = true; speak(); }
 }
 async function eject() {
   if (busy || current === null) return;
@@ -941,7 +992,7 @@ async function eject() {
   const i = current; current = null; setChips();
   view = "overview"; flyTo(overviewView(), .9);
   await ejectAnim(i);
-  bootScreen(homeContent()); setHud(null);
+  homeDemo(); setHud(null);
   busy = false;
 }
 
@@ -1080,7 +1131,7 @@ function introUpdate(e) {
   camera.position.lerpVectors(introFrom.pos, o.pos, k);
   controls.target.lerpVectors(introFrom.target, o.target, k);
   camera.lookAt(controls.target);
-  if (e > 1.4 && attract) bootScreen(homeContent());
+  if (e > 1.4 && attract) homeDemo();
   if (e > 3.2) finishIntro();
 }
 function unlockAudio() {
@@ -1106,10 +1157,9 @@ async function finishIntro() {
   const o = overviewView();
   camera.position.copy(o.pos); controls.target.copy(o.target); camera.lookAt(o.target); controls.update();
   controls.enabled = true;
-  if (attract || !scrOn) bootScreen(homeContent());
+  if (current === null) homeDemo();
   setHud(null);
-  // first visit: load "Meet the Author" and play AJ's voice
-  setTimeout(async () => { await insert(0); if (current === 0 && soundOn) speak(); }, reduceMotion ? 0 : 400);
+  // nothing loads on its own: visitors pick a cartridge
 }
 $("start").addEventListener("click", startIntro);
 
@@ -1126,7 +1176,7 @@ Promise.all([
 }).catch(() => {});
 
 addEventListener("resize", () => {
-  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  camera.aspect = innerWidth / innerHeight; camera.fov = narrow() ? 40 : 54; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
   if (phase === "pre") { placeStart(); return; }
   if (phase !== "ready" || busy) return;
@@ -1176,7 +1226,7 @@ function loop() {
 
   // screen redraw only when something changes
   const blink = Math.floor(t / .55);
-  if ((attract && t - lastNoise > 1 / 24) || scrAnimating || (scrOn && scrContent && scrContent.blink && blink !== lastBlink) || (!scrOn && !attract && t - lastNoise > .12)) {
+  if (((attract || demo) && t - lastNoise > 1 / 24) || scrAnimating || (scrOn && scrContent && scrContent.blink && blink !== lastBlink) || (!scrOn && !attract && t - lastNoise > .12)) {
     drawScreen(t); lastBlink = blink; lastNoise = t;
   }
 
