@@ -701,7 +701,7 @@ const music = (() => {
   // slow 12-bar blues in C: shuffle beat with brushes, boogie bass, warm chords, a breathy tenor sax
   let master, timer, step = 0, noiseBuf = null;
   const BEAT = 60 / 72, BAR = BEAT * 4, VOL = .55, DUCK = .2;
-  const TRACK_URL = "blues_sax.mp3", TRACK_VOL = .6, TRACK_DUCK = .18;
+  const TRACK_URL = "blues_sax.mp3", TRACK_VOL = .42, TRACK_DUCK = .14;
   let track = null, usingTrack = false, ducked = false, trackBytes = null, trackBuf;
   const lvl = () => usingTrack ? (ducked ? TRACK_DUCK : TRACK_VOL) : (ducked ? DUCK : VOL);
   try { trackBytes = fetch(TRACK_URL).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null); } catch (e) { trackBytes = Promise.resolve(null); }
