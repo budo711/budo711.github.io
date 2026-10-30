@@ -46,13 +46,6 @@ html, body, button, a, #hud, #chips { touch-action: manipulation; }
 @keyframes pulse { 50% { box-shadow: 0 0 0 10px rgba(125,255,176,.08), 0 0 44px rgba(125,255,176,.6); } }
 
 /* Sound toggle */
-/* phones: the window is off to the side, so give it a button */
-#peek {
-  position: fixed; top: calc(max(14px, env(safe-area-inset-top)) + 46px); right: max(14px, env(safe-area-inset-right));
-  z-index: 4; font-family: var(--pixel); font-size: 10px; color: var(--ink);
-  background: rgba(18,15,28,.75); border: 1px solid rgba(160,190,255,.35); border-radius: 8px; padding: 10px 12px; cursor: pointer;
-}
-#peek[hidden] { display: none; }
 #sound {
   position: fixed; top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right));
   z-index: 4; font-family: var(--pixel); font-size: 10px; color: var(--ink);
@@ -99,6 +92,8 @@ html, body, button, a, #hud, #chips { touch-action: manipulation; }
   box-shadow: inset 0 -3px 0 rgba(0,0,0,.25);
 }
 .chip[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 2px; }
+#hint .small { display: none; }
+@media (max-width: 699px) { #hint .wide { display: none; } #hint .small { display: inline; } }
 #hint { font-family: var(--crt); font-size: 18px; color: var(--muted); margin: 0; }
 
 /* Rex's speech bubble */
@@ -132,7 +127,6 @@ html, body, button, a, #hud, #chips { touch-action: manipulation; }
 <button id="start" type="button">&#129689; TAP THE COIN TO START</button>
 
 <button id="sound" type="button" hidden>&#9835; SOUND ON</button>
-<button id="peek" type="button" hidden>&#9748; LOOK OUTSIDE</button>
 <a id="books" href="https://www.amazon.com/stores/author/B0HPCTL3QY/allbooks" target="_blank" rel="noopener" style="display:none">&#128218; REX BOOKS ON AMAZON</a>
 
 <section id="hud" hidden aria-live="polite">
@@ -140,7 +134,7 @@ html, body, button, a, #hud, #chips { touch-action: manipulation; }
   <div id="hudBtns"></div>
   <div id="chips" role="group" aria-label="Cartridges"></div>
   <div id="hudText"></div>
-  <p id="hint">Drag to look around &middot; tap a cartridge or the window</p>
+  <p id="hint">Drag to look around &middot; <span class="wide">tap a cartridge or the window</span><span class="small">tap a cartridge</span></p>
 </section>
 
 <div id="bubble">WOOF!</div>
@@ -1257,7 +1251,7 @@ function unlockAudio() {
 async function startIntro() {
   if (phase !== "pre") return;
   phase = "coin";
-  $("start").classList.add("gone"); $("sound").hidden = false; $("peek").hidden = !narrow(); $("books").hidden = false;
+  $("start").classList.add("gone"); $("sound").hidden = false; $("books").hidden = false;
   unlockAudio(); music.start(); rain.start();
   camera.position.copy(introFrom.pos); camera.lookAt(introFrom.target);
   await coinFly();
@@ -1277,8 +1271,6 @@ async function finishIntro() {
   // nothing loads on its own: visitors pick a cartridge
 }
 $("start").addEventListener("click", startIntro);
-$("peek").addEventListener("click", () => { if (phase === "ready") windowPeek(); });
-addEventListener("resize", () => { if (phase === "ready" || phase === "intro") $("peek").hidden = !narrow(); });
 
 // tap the window: a quick look outside at the rainy street, with a flash of lightning
 async function windowPeek() {
