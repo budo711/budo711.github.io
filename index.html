@@ -24,6 +24,8 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--room); color: var(--ink); font-family: var(--label); }
 #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+/* stop iPhone Safari from zooming the page on quick taps */
+html, body, button, a, #hud, #chips { touch-action: manipulation; }
 
 /* Intro */
 #intro {
@@ -474,6 +476,8 @@ let book = null;
   book = new THREE.Mesh(new THREE.BoxGeometry(.16, .016, .16), [pages, spine, coverM, pages, pages, pages]);
   book.position.set(.06, .519, .12); book.rotation.y = -.35; book.castShadow = true; C.add(book);
   book.userData.book = true;
+  const hitB = new THREE.Mesh(new THREE.BoxGeometry(.34, .14, .34), new THREE.MeshBasicMaterial({ visible: false }));
+  hitB.position.copy(book.position); hitB.userData.book = true; C.add(hitB);
 }
 
 // low wooden shelf for the cartridges
@@ -613,6 +617,8 @@ const rex = { group: new THREE.Group(), pivot: new THREE.Group(), top: new THREE
   P.add(new THREE.Mesh(new THREE.TubeGeometry(rp, 20, 0.018, 8), ropeB));
   for (const [x, z] of [[-0.15, 0.05], [0.12, 0.06]]) { const k = new THREE.Mesh(new THREE.SphereGeometry(0.035, 14, 10), rope); k.position.set(x, 0.49, z); k.castShadow = true; P.add(k); }
   rex.top.position.set(0, 1.2, 0); P.add(rex.top);
+  const hitR = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.15, 0.8), new THREE.MeshBasicMaterial({ visible: false }));
+  hitR.position.set(0, 0.57, -0.05); P.add(hitR);
   R.traverse(o => { if (o.isMesh) o.userData.rex = true; });
   // his softball on the seat and frisbee leaning on the rocker (they don't rock)
   const ball = new THREE.Mesh(new THREE.SphereGeometry(0.048, 20, 14), mat(0xf1ec5a, { roughness: .7 }));
@@ -1148,18 +1154,26 @@ function pick(x, y) {
 }
 let down = null;
 canvas.addEventListener("pointerdown", e => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
-canvas.addEventListener("pointerup", e => {
-  if (!down) return;
-  const tap = Math.hypot(e.clientX - down.x, e.clientY - down.y) < 9 && performance.now() - down.t < 650;
-  down = null;
+// taps: handled on pointerup, with a "click" backup for iPhone Safari, which sometimes drops the pointer events
+let lastTapAt = 0;
+function handleTap(x, y) {
+  lastTapAt = performance.now();
   if (phase === "intro") { skipIntro(); return; }
-  if (phase === "pre") { if (tap) { const u0 = pick(e.clientX, e.clientY); if (u0 && u0.coin) startIntro(); } return; }
+  if (phase === "pre") { const u0 = pick(x, y); if (u0 && u0.coin) startIntro(); return; }
   if (phase !== "ready") return;
-  if (!tap) { hideHint(); return; }
-  const u = pick(e.clientX, e.clientY);
+  const u = pick(x, y);
   if (!u) return;
   if (u.win) windowPeek(); else if (u.rex) rexTap(); else if (u.book) insert(games.findIndex(g => g.id === "rex-books")); else insert(u.cart);
+}
+canvas.addEventListener("pointerup", e => {
+  if (!down) return;
+  const slop = e.pointerType === "touch" ? 16 : 9;
+  const tap = Math.hypot(e.clientX - down.x, e.clientY - down.y) < slop && performance.now() - down.t < 900;
+  down = null;
+  if (!tap) { if (phase === "intro") skipIntro(); else hideHint(); return; }
+  handleTap(e.clientX, e.clientY);
 });
+canvas.addEventListener("click", e => { if (performance.now() - lastTapAt > 400) handleTap(e.clientX, e.clientY); });
 let hovered = null;
 canvas.addEventListener("pointermove", e => {
   if (coarse || (phase !== "ready" && phase !== "pre")) return;
