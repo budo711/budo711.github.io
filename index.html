@@ -129,7 +129,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--room);
   <div id="hudBtns"></div>
   <div id="chips" role="group" aria-label="Cartridges"></div>
   <div id="hudText"></div>
-  <p id="hint">Drag to look around &middot; tap a cartridge</p>
+  <p id="hint">Drag to look around &middot; tap a cartridge or the window</p>
 </section>
 
 <div id="bubble">WOOF!</div>
@@ -315,7 +315,7 @@ const haloMat = new THREE.SpriteMaterial({ map: radialTex("rgba(140,80,255,.55)"
 const halo = new THREE.Sprite(haloMat); halo.position.set(0, 1.4, -1.4); halo.scale.set(5.5, 5.5, 1); scene.add(halo);
 
 // rainy window on the back wall
-const win = canvasTex(512, 384);
+const win = canvasTex(1024, 768);
 const drops = Array.from({ length: 90 }, () => ({ x: Math.random() * 512, y: Math.random() * 384, l: 8 + Math.random() * 22, v: 260 + Math.random() * 380 }));
 const beads = Array.from({ length: 40 }, () => ({ x: Math.random() * 512, y: Math.random() * 384, r: 1.5 + Math.random() * 2.5 }));
 let flash = 0, bolt = null, strikeT = -99, nextStrike = 9 + Math.random() * 8, winLight = null;
@@ -337,8 +337,20 @@ function lightning(t) {
   if (reduceMotion) flash *= .35;
   if (winLight) winLight.intensity = .5 + flash * 5;
 }
+const CITY = (() => {
+  let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  const far = []; for (let x = -10; x < 520; x += 38 + rnd() * 30) far.push([x, 150 + rnd() * 90, 30 + rnd() * 40]);
+  const near = []; let x = -8;
+  while (x < 520) {
+    const w = 52 + rnd() * 50, y = 205 + rnd() * 80, wins = [];
+    for (let wy = y + 12; wy < 328; wy += 18) for (let wx = x + 8; wx < x + w - 12; wx += 15)
+      wins.push({ x: wx, y: wy, on: rnd() < .42, warm: rnd() < .8, flick: rnd() < .12 ? rnd() * 20 : 0 });
+    near.push({ x, y, w, wins }); x += w + 6 + rnd() * 14;
+  }
+  return { far, near };
+})();
 function drawWindow(t, dt) {
-  const g = win.g, W = 512, H = 384;
+  const g = win.g, W = 512, H = 384; g.setTransform(2, 0, 0, 2, 0, 0);
   const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, "#0a1230"); sky.addColorStop(1, "#1d2348");
   g.fillStyle = sky; g.fillRect(0, 0, W, H);
   if (flash > .02) {
@@ -349,11 +361,28 @@ function drawWindow(t, dt) {
       g.restore();
     }
   }
-  g.fillStyle = "#0b0f22"; [[0, 230, 90, 154], [100, 200, 70, 184], [190, 250, 110, 134], [320, 215, 80, 169], [410, 240, 102, 144]].forEach(r => g.fillRect(...r));
-  [[40, 260], [125, 230], [140, 290], [230, 280], [350, 250], [440, 270], [470, 300], [60, 310]].forEach(([x, y], i) => {
-    g.fillStyle = i % 3 ? "rgba(255,200,110,.75)" : "rgba(255,230,160,.55)"; g.fillRect(x, y, 10, 13);
-  });
-  const lamp = g.createRadialGradient(300, 150, 0, 300, 150, 120); lamp.addColorStop(0, "rgba(255,170,80,.55)"); lamp.addColorStop(1, "rgba(255,170,80,0)");
+  // far skyline, then nearer buildings with lit windows (some flicker off and on)
+  g.fillStyle = "#141a3a"; CITY.far.forEach(([x, y, w]) => g.fillRect(x, y, w, 340 - y));
+  for (const bd of CITY.near) {
+    g.fillStyle = "#0b0f22"; g.fillRect(bd.x, bd.y, bd.w, 340 - bd.y);
+    for (const wn of bd.wins) {
+      if (!wn.on || (wn.flick && Math.sin(t * .35 + wn.flick) > .85)) continue;
+      g.fillStyle = wn.warm ? "rgba(255,196,110,.85)" : "rgba(190,215,255,.6)"; g.fillRect(wn.x, wn.y, 7, 9);
+    }
+  }
+  // wet street with smeared reflections
+  const st = g.createLinearGradient(0, 340, 0, H); st.addColorStop(0, "#0d1128"); st.addColorStop(1, "#05070f");
+  g.fillStyle = st; g.fillRect(0, 340, W, H - 340);
+  for (const bd of CITY.near) for (const wn of bd.wins) if (wn.on && wn.y > 260) {
+    g.fillStyle = wn.warm ? "rgba(255,190,100,.12)" : "rgba(170,200,255,.09)";
+    g.fillRect(wn.x + Math.sin(t * 3 + wn.x) * 1.5, 344 + (340 - wn.y) * .35, 7, 22);
+  }
+  // street lamp with its glow and a pool of light on the wet road
+  g.fillStyle = "#06080f"; g.fillRect(298, 172, 5, 168); g.fillRect(286, 168, 22, 5);
+  g.fillStyle = "#ffd28a"; g.fillRect(288, 173, 12, 4);
+  const pool = g.createRadialGradient(294, 360, 0, 294, 360, 70); pool.addColorStop(0, "rgba(255,180,90,.35)"); pool.addColorStop(1, "rgba(255,180,90,0)");
+  g.fillStyle = pool; g.fillRect(200, 330, 190, 54);
+  const lamp = g.createRadialGradient(294, 178, 0, 294, 178, 110); lamp.addColorStop(0, "rgba(255,170,80,.5)"); lamp.addColorStop(1, "rgba(255,170,80,0)");
   g.fillStyle = lamp; g.fillRect(0, 0, W, H);
   g.strokeStyle = "rgba(190,210,255,.35)"; g.lineWidth = 1.4;
   for (const d of drops) {
@@ -372,6 +401,7 @@ function drawWindow(t, dt) {
   [[0, .6, 1.64, .08], [0, -.6, 1.64, .08], [-.78, 0, .08, 1.28], [.78, 0, .08, 1.28], [0, 0, .04, 1.12], [0, 0, 1.5, .04]]
     .forEach(([x, y, w, h]) => add(W, new THREE.BoxGeometry(w, h, .06), wood, x, y, .03));
   add(W, new THREE.BoxGeometry(1.78, .05, .16), wood, 0, -.66, .08);
+  W.traverse(o => { if (o.isMesh) o.userData.win = true; });
   winLight = new THREE.PointLight(0x9fb4ff, .5, 5, 2); winLight.position.set(-1.75, 1.6, -2.6); scene.add(winLight);
 }
 drawWindow(0, 0);
@@ -1085,7 +1115,7 @@ const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 function pick(x, y) {
   ndc.set(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1);
   ray.setFromCamera(ndc, camera);
-  const hit = ray.intersectObjects(scene.children, true).find(h => h.object.userData.cart !== undefined || h.object.userData.rex || h.object.userData.book || (h.object.userData.coin && coin.visible));
+  const hit = ray.intersectObjects(scene.children, true).find(h => h.object.userData.cart !== undefined || h.object.userData.rex || h.object.userData.book || h.object.userData.win || (h.object.userData.coin && coin.visible));
   return hit ? hit.object.userData : null;
 }
 let down = null;
@@ -1100,7 +1130,7 @@ canvas.addEventListener("pointerup", e => {
   if (!tap) { hideHint(); return; }
   const u = pick(e.clientX, e.clientY);
   if (!u) return;
-  if (u.rex) rexTap(); else if (u.book) insert(games.findIndex(g => g.id === "rex-books")); else insert(u.cart);
+  if (u.win) windowPeek(); else if (u.rex) rexTap(); else if (u.book) insert(games.findIndex(g => g.id === "rex-books")); else insert(u.cart);
 });
 let hovered = null;
 canvas.addEventListener("pointermove", e => {
@@ -1195,6 +1225,21 @@ async function finishIntro() {
   // nothing loads on its own: visitors pick a cartridge
 }
 $("start").addEventListener("click", startIntro);
+
+// tap the window: a quick look outside at the rainy street, with a flash of lightning
+async function windowPeek() {
+  if (busy) return;
+  busy = true; hideHint();
+  const hud = $("hud"), hudWas = hud.hidden; hud.hidden = true;
+  const t = tanHalf(), g = new THREE.Vector3(-1.75, 1.6, -3.17);
+  const d = Math.max(1.2 / t, 1.62 / (t * camera.aspect));
+  await flyTo({ pos: g.clone().add(new THREE.Vector3(0, 0, d)), target: g }, reduceMotion ? .01 : 1.3);
+  nextStrike = Math.min(nextStrike, clock.elapsedTime + .7);
+  await tween(4.2, () => {});
+  hud.hidden = hudWas;
+  await flyTo(current !== null && view === "screen" ? screenView() : overviewView(), reduceMotion ? .01 : 1.3);
+  busy = false;
+}
 
 /* ---------- start ---------- */
 setLights(PRE_LIGHT); setMarquee(0); setScreenLight(.7);
